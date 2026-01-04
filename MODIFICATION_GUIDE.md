@@ -25,11 +25,9 @@ class GeometricPath:
 **修改为：**
 ```python
 class GeometricPath:
-    def __init__(self, position, target_position, g_cost, h_cost, parent_node):
+    def __init__(self, position, g_cost, h_cost, parent_node):
         # position: [x, y] 当前节点位置
-        # target_position: [x, y] 目标位置（通常是goal或者下一个中间目标）
         self.position = position
-        self.target_position = target_position
         self.g_cost = g_cost  # 从起点到当前节点的实际代价
         self.h_cost = h_cost  # 从当前节点到目标的启发式代价
         self.f_cost = g_cost + h_cost  # 总代价
@@ -88,7 +86,6 @@ def reconstruct_path(goal_node):
     initial_h_cost = calculate_heuristic(start_point, goal_point)
     initial_node = GeometricPath(
         position=start_point,
-        target_position=goal_point,
         g_cost=initial_g_cost,
         h_cost=initial_h_cost,
         parent_node=None
@@ -181,7 +178,6 @@ def reconstruct_path(goal_node):
 ```python
         current_node = heapq.heappop(search_set)
         current_pos = current_node.position
-        target_pos = current_node.target_position
         
         print(f"当前节点: {current_pos}, g={current_node.g_cost:.2f}, h={current_node.h_cost:.2f}, f={current_node.f_cost:.2f}")
         
@@ -192,47 +188,33 @@ def reconstruct_path(goal_node):
         visited.add(pos_key)
         
         # 5. 检测从当前节点到目标位置是否有碰撞
-        is_collided, col_pt, _ = line_collision_check_fast(current_pos, target_pos, mapParameters)
+        is_collided, col_pt, _ = line_collision_check_fast(current_pos, goal_point, mapParameters)
         
         if visualize_level > 2:
-            plt.plot([current_pos[0], target_pos[0]], [current_pos[1], target_pos[1]], 
+            plt.plot([current_pos[0], goal_point[0]], [current_pos[1], goal_point[1]], 
                     linewidth=2, color='orange', alpha=0.5)
             if col_pt is not None:
                 plt.plot(col_pt[0], col_pt[1], 'bo', markersize=6)
             plt.pause(0.1)
         
         if not is_collided:
-            # 没有碰撞，检查是否到达目标
-            if calculate_heuristic(target_pos, goal_point) < 0.1:
-                # 到达目标！
-                print(f"搜索成功！迭代次数: {iteration}")
-                
-                # 创建目标节点
-                goal_node = GeometricPath(
-                    position=goal_point,
-                    target_position=goal_point,
-                    g_cost=current_node.g_cost + calculate_heuristic(current_pos, goal_point),
-                    h_cost=0.0,
-                    parent_node=current_node
-                )
-                
-                # 重建路径
-                path_points = reconstruct_path(goal_node)
-                final_traj_x = [p[0] for p in path_points]
-                final_traj_y = [p[1] for p in path_points]
-                
-                return final_traj_x, final_traj_y
-            else:
-                # 到达中间目标，继续向goal前进
-                intermediate_node = GeometricPath(
-                    position=target_pos,
-                    target_position=goal_point,
-                    g_cost=current_node.g_cost + calculate_heuristic(current_pos, target_pos),
-                    h_cost=calculate_heuristic(target_pos, goal_point),
-                    parent_node=current_node
-                )
-                heapq.heappush(search_set, intermediate_node)
-                continue
+            # 没有碰撞，成功到达目标
+            print(f"搜索成功！迭代次数: {iteration}")
+            
+            # 创建目标节点
+            goal_node = GeometricPath(
+                position=goal_point,
+                g_cost=current_node.g_cost + calculate_heuristic(current_pos, goal_point),
+                h_cost=0.0,
+                parent_node=current_node
+            )
+            
+            # 重建路径
+            path_points = reconstruct_path(goal_node)
+            final_traj_x = [p[0] for p in path_points]
+            final_traj_y = [p[1] for p in path_points]
+            
+            return final_traj_x, final_traj_y
 ```
 
 #### 3.3 碰撞处理部分（约第362-400行）
@@ -310,7 +292,7 @@ def reconstruct_path(goal_node):
         print('collision_point', col_pt)
         
         # 7. 找到 OB 距直线最远的点 L 和 R (左右各一个)
-        furthest_L, furthest_R = find_furthest_obstacle_point(col_pt, mapParameters, current_pos, target_pos)
+        furthest_L, furthest_R = find_furthest_obstacle_point(col_pt, mapParameters, current_pos, goal_point)
         
         if visualize_level > 3:
             if furthest_L is not None:
@@ -331,7 +313,6 @@ def reconstruct_path(goal_node):
                 
                 left_node = GeometricPath(
                     position=furthest_L,
-                    target_position=target_pos,
                     g_cost=g_cost_L,
                     h_cost=h_cost_L,
                     parent_node=current_node
@@ -349,7 +330,6 @@ def reconstruct_path(goal_node):
                 
                 right_node = GeometricPath(
                     position=furthest_R,
-                    target_position=target_pos,
                     g_cost=g_cost_R,
                     h_cost=h_cost_R,
                     parent_node=current_node
